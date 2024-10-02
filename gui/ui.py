@@ -97,6 +97,20 @@ def create_choice_list():
         img_id += 1
 
 
+def check_solve_progress(dd: DragDrop):
+    total = len(dd.draggable_items)
+    matching = 0
+    for item in dd.draggable_items:
+        user_data: ImageFragment = dpg.get_item_user_data(item)
+        pos = str(item).split('-')[1]
+        if pos == user_data.name:
+            matching += 1
+
+    solved = matching / total
+    print(f"{solved * 100}%")
+    dpg.set_value("ProgressBar", solved)
+
+
 def create_puzzle(sender):
     path = sender
     image = Image.open(path)
@@ -112,37 +126,37 @@ def create_puzzle(sender):
     segment_height = image_height // rows
 
     delete_group_and_textures("PuzzleGroup")
-    dd = DragDrop(group_textures)
+    dd = DragDrop(group_textures, check_solve_progress)
 
     image_fragments = []
     with dpg.group(tag="PuzzleGroup", parent="PuzzleWindow"):
         for row in range(rows):
             for col in range(cols):
                 # Calculate the cropping box for each part (left, upper, right, lower)
-                left = col * segment_width
-                upper = row * segment_height
-                right = (col + 1) * segment_width
-                lower = (row + 1) * segment_height
+                left = row * segment_width
+                upper = col * segment_height
+                right = left + segment_width
+                lower = upper + segment_height
 
                 # Crop the image
                 cropped_image = image.crop((left, upper, right, lower))
                 cropped_image = resize_image(cropped_image, 100, 100)
                 width, height = cropped_image.size
-                # cropped_image.save(f"img{row}_{col}.jpg")
+                # cropped_image.save(f"img{row}_{col}_{(left, upper, right, lower)}.jpg")
                 cropped_image = cropped_image.convert("RGBA")
                 image_data = list(cropped_image.getdata())  # Get pixel data
                 image_data = [item / 255 for pixel in image_data for item in pixel]  # Normalize data to [0.0, 1.0]
-                image_fragments.append(ImageFragment(image_data, row, col))
+                image_fragments.append(ImageFragment(image_data, row, col, (left, upper, right, lower)))
                 random.shuffle(image_fragments)
 
         x, y = 0, 0
         for frag in image_fragments:
             created_img = dd.create_draggable_image(
-                frag.fragment,
+                frag,
                 width,
                 height,
-                f"PuzzleBox{frag.name}",
-                f"PuzzleBoxTexture{frag.name}",
+                f"PuzzleBox-{x}_{y}",
+                f"PuzzleBoxTexture-{frag.name}",
                 parent="PuzzleGroup")
             dpg.set_item_pos(created_img, [20 + width * x, 80 + height * y])
 
@@ -163,6 +177,8 @@ def load_and_run():
     with dpg.window(label="", tag="PuzzleWindow", width=400, height=300, no_close=True,
                     no_collapse=True):
         create_choice_list()
+
+        dpg.add_progress_bar(label="Progress", tag="ProgressBar", width=300, default_value=0, pos=(30, 500))
 
     # Setup and show viewport
     dpg.create_viewport(title="Picture puzzle", width=800, height=600)
