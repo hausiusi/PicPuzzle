@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+import random
+
 import dearpygui.dearpygui as dpg
 from gui.image_tools import load_image, resize_image
 from gui.drag_drop import DragDrop
+from gui.image_fragment import ImageFragment
 from PIL import Image
 
 group_textures = {}  # Save all textures of the puzzle to delete them easily later
@@ -111,6 +114,7 @@ def create_puzzle(sender):
     delete_group_and_textures("PuzzleGroup")
     dd = DragDrop(group_textures)
 
+    image_fragments = []
     with dpg.group(tag="PuzzleGroup", parent="PuzzleWindow"):
         for row in range(rows):
             for col in range(cols):
@@ -128,14 +132,25 @@ def create_puzzle(sender):
                 cropped_image = cropped_image.convert("RGBA")
                 image_data = list(cropped_image.getdata())  # Get pixel data
                 image_data = [item / 255 for pixel in image_data for item in pixel]  # Normalize data to [0.0, 1.0]
-                created_img = dd.create_draggable_image(
-                    image_data,
-                    width,
-                    height,
-                    f"PuzzleBox{row}_{col}",
-                    f"PuzzleBoxTexture{row}_{col}",
-                    parent="PuzzleGroup")
-                dpg.set_item_pos(created_img, [20 + width * row, 80 + height * col])
+                image_fragments.append(ImageFragment(image_data, row, col))
+                random.shuffle(image_fragments)
+
+        x, y = 0, 0
+        for frag in image_fragments:
+            created_img = dd.create_draggable_image(
+                frag.fragment,
+                width,
+                height,
+                f"PuzzleBox{frag.name}",
+                f"PuzzleBoxTexture{frag.name}",
+                parent="PuzzleGroup")
+            dpg.set_item_pos(created_img, [20 + width * x, 80 + height * y])
+
+            if x < rows - 1:
+                x += 1
+            else:
+                x = 0
+                y += 1
 
 
 def load_and_run():
