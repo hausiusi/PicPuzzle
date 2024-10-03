@@ -51,6 +51,7 @@ def delete_group_and_textures(group_tag):
         # Remove the group from the dictionary after deletion
         del group_textures[group_tag]
 
+    dpg.set_value("ProgressBar", 0)
 
 def create_clickable_image(image_data, width, height, image_tag, texture_tag):
     with dpg.texture_registry():
