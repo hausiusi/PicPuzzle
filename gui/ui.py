@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import pygame
 import random
 
 import dearpygui.dearpygui as dpg
@@ -12,6 +13,8 @@ from PIL import Image
 
 group_textures = {}  # Save all textures of the puzzle to delete them easily later
 payload_buffer = ""  # Buffer to use in drag and drop. This is the drag object
+audio_root_path = "data/sounds"
+last_progress = 0
 
 
 # Callbacks
@@ -53,6 +56,7 @@ def delete_group_and_textures(group_tag):
 
     dpg.set_value("ProgressBar", 0)
 
+
 def create_clickable_image(image_data, width, height, image_tag, texture_tag):
     with dpg.texture_registry():
         texture_id = dpg.add_static_texture(width, height, image_data, tag=texture_tag)
@@ -72,6 +76,15 @@ def list_files_in_directory(directory):
         return None
     except Exception as e:
         return str(e)
+
+
+def play_audio(audio_path):
+    pygame.mixer.init()
+    pygame.mixer.music.load(audio_path)
+    pygame.mixer.music.play()
+
+    while pygame.mixer.music.get_busy():
+        pygame.time.Clock().tick(10)
 
 
 def align_right(item, right_margin=20):
@@ -98,7 +111,7 @@ def create_choice_list():
         img_id += 1
 
 
-def check_solve_progress(dd: DragDrop):
+def check_solve_progress(dd: DragDrop, play_startup_sound=False):
     total = len(dd.draggable_items)
     matching = 0
     for item in dd.draggable_items:
@@ -107,9 +120,24 @@ def check_solve_progress(dd: DragDrop):
         if pos == user_data.name:
             matching += 1
 
-    solved = matching / total
-    print(f"{solved * 100}%")
-    dpg.set_value("ProgressBar", solved)
+    current_progress = matching / total
+    print(f"{current_progress * 100}%")
+    dpg.set_value("ProgressBar", current_progress)
+    global last_progress
+    if play_startup_sound:
+        play_audio(os.path.join(audio_root_path, "start.mp3"))
+    elif current_progress >= 1:
+        print("Puzzle completed")
+        play_audio(os.path.join(audio_root_path, "completed.mp3"))
+        current_progress = 0  # Restart the progress tracking
+    elif last_progress < current_progress:
+        play_audio(os.path.join(audio_root_path, "correct.mp3"))
+    elif last_progress > current_progress:
+        play_audio(os.path.join(audio_root_path, "wrong.mp3"))
+    elif last_progress == current_progress:
+        play_audio(os.path.join(audio_root_path, "move.mp3"))
+
+    last_progress = current_progress
 
 
 def create_puzzle(sender):
@@ -119,8 +147,8 @@ def create_puzzle(sender):
     image_width, image_height = image.size
 
     # Define the number of rows and columns (3x3 grid)
-    rows = 3
-    cols = 3
+    rows = 4
+    cols = 4
 
     # Calculate the width and height of each segment
     segment_width = image_width // cols
@@ -166,6 +194,8 @@ def create_puzzle(sender):
             else:
                 x = 0
                 y += 1
+
+        check_solve_progress(dd, True)
 
 
 def load_and_run():
